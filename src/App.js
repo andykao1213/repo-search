@@ -48,27 +48,30 @@ class SimpleTabs extends React.Component {
 
   constructor(props){
     super(props);
+    // this timer is for detecting the time space between two api request.
     var timing = setTimeout(()=>{},0);
   }
 
   componentDidMount() {
+    // add event listner to scrolling
     window.addEventListener('scroll', this.handleScroll);
   }
 
   state = {
-    searching: false,
-    total_count: 0,
-    repoStore:[],
-    repos: [],
-    loading: false,
-    searchKeyWord: '',
-    page: 1,
-    end: false,
-    lastChange: new Date(),
+    searching: false,   // determine showing 'repostitory results' or not
+    total_count: 0, 
+    repoStore:[],       // store the repo data that isn't render yet
+    repos: [],          // store the data that is rendered
+    loading: false,     // determine if the progress icon should show
+    searchKeyWord: '',  // to determine the word last searched.
+    page: 1,            // which page should be request  
+    end: false,         // if the page scroll to the end
+    lastChange: new Date(), // last time change the text field
   };
 
+  // this function send the request to GitHub
   fetchData(str, isAdding) {
-    console.log('search');
+    
     fetch(`https://api.github.com/search/repositories?q=${str}&page=${this.state.page}&per_page=100`, {
       headers: {
         "Content-Type": "application/json"
@@ -80,15 +83,17 @@ class SimpleTabs extends React.Component {
       else throw Error(resp.statusText);
     })
     .then(data => {
+      //Process the response data
       let {total_count, items} = data;
+      //if there is no repos from GitHub
       if(!items.length){
         this.setState({
           end: true,
         });
         return;
       }
-      
-
+    
+      // Everytime, we store all the request data in repoStore, and we pop out 10 items to repos and render them.
       let repos = items.slice(0, 10);
       let repoStore = items;
       repoStore.splice(0, 10);
@@ -109,10 +114,11 @@ class SimpleTabs extends React.Component {
 
   
   handleScroll = event => {
+    // check if the page is scroll to the end
     let distToBottom = Math.max(document.body.offsetHeight - (window.pageYOffset + window.innerHeight), 0);
     if (!this.state.loading && distToBottom <= 20 && !this.state.end) {
-      console.log('page end')
 
+      // if there is still data in repoStore, render them!
       if(this.state.repoStore.length){
         let newRepoStore = this.state.repoStore;
         let newRepo = this.state.repoStore.slice(0, 10);
@@ -123,6 +129,7 @@ class SimpleTabs extends React.Component {
         });
       }
       else{
+        // No data in repoStore, send request
         this.setState({
           loading: true,
           page: this.state.page + 1,
@@ -134,6 +141,7 @@ class SimpleTabs extends React.Component {
     }
   };
 
+  // if we press enter at the textfield, send request
   handleKeyPress = event => {
     if(event.key === 'Enter'){
       if(event.target.value.trim() && event.target.value !== this.state.searchKeyWord){
@@ -145,6 +153,7 @@ class SimpleTabs extends React.Component {
     }
   };
 
+  // if textfield has been change, send request. In order to lessen the request, if user didn't type for 3sec, send request
   handleChange = event => {
     clearTimeout(this.timing);
     function foo(str) {
