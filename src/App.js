@@ -3,15 +3,12 @@ import PropTypes from 'prop-types';
 import { withStyles } from '@material-ui/core/styles';
 import TextField from '@material-ui/core/TextField';
 import Typography from '@material-ui/core/Typography';
-import Button from '@material-ui/core/Button';
 import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
 import ListItemText from '@material-ui/core/ListItemText';
 import ListItemIcon from '@material-ui/core/ListItemIcon';
 import StarIcon from '@material-ui/icons/Star';
 import Divider from '@material-ui/core/Divider';
-import Menu from '@material-ui/core/Menu';
-import MenuItem from '@material-ui/core/MenuItem';
 import _ from 'lodash';
 import Link from '@material-ui/core/Link';
 import CircularProgress from '@material-ui/core/CircularProgress';
@@ -49,24 +46,30 @@ const styles = theme => ({
 
 class SimpleTabs extends React.Component {
 
+  constructor(props){
+    super(props);
+    var timing = setTimeout(()=>{},0);
+  }
+
   componentDidMount() {
     window.addEventListener('scroll', this.handleScroll);
   }
 
   state = {
     searching: false,
-    anchorEl: null,
     total_count: 0,
+    repoStore:[],
     repos: [],
     loading: false,
     searchKeyWord: '',
     page: 1,
     end: false,
+    lastChange: new Date(),
   };
 
   fetchData(str, isAdding) {
     console.log('search');
-    fetch(`https://api.github.com/search/repositories?q=${str}&page=${this.state.page}&per_page=10`, {
+    fetch(`https://api.github.com/search/repositories?q=${str}&page=${this.state.page}&per_page=100`, {
       headers: {
         "Content-Type": "application/json"
       },
@@ -84,12 +87,19 @@ class SimpleTabs extends React.Component {
         });
         return;
       }
+      
+
+      let repos = items.slice(0, 10);
+      let repoStore = items;
+      repoStore.splice(0, 10);
+
       this.setState({
         total_count: total_count,
-        repos: isAdding? [...this.state.repos, ...items]:items,
+        repos: isAdding? [...this.state.repos, ...repos]:repos,
         searching: true,
         loading: false,
         searchKeyWord: str,
+        repoStore: repoStore,
       });
     })
     .catch(err => {
@@ -97,44 +107,60 @@ class SimpleTabs extends React.Component {
     })
   }
 
+  
   handleScroll = event => {
     let distToBottom = Math.max(document.body.offsetHeight - (window.pageYOffset + window.innerHeight), 0);
     if (!this.state.loading && distToBottom <= 20 && !this.state.end) {
       console.log('page end')
-      this.setState({
-        loading: true,
-        page: this.state.page + 1,
-      });
 
-      this.fetchData(this.state.searchKeyWord, true);
+      if(this.state.repoStore.length){
+        let newRepoStore = this.state.repoStore;
+        let newRepo = this.state.repoStore.slice(0, 10);
+        newRepoStore.splice(0, 10);
+        this.setState({
+          repoStore: newRepoStore,
+          repos: [...this.state.repos, ...newRepo],
+        });
+      }
+      else{
+        this.setState({
+          loading: true,
+          page: this.state.page + 1,
+        });
+
+        this.fetchData(this.state.searchKeyWord, true);
+      }
+      
     }
-  };
-
-  handleChange = (event, value) => {
-    this.setState({ value });
-  };
-
-  handleClick = event => {
-    this.setState({ anchorEl: event.currentTarget });
-  };
-
-  handleClose = () => {
-    this.setState({ anchorEl: null });
   };
 
   handleKeyPress = event => {
     if(event.key === 'Enter'){
-      if(event.target.value.trim() && event.target.value !== this.state.searchKeyWord)
+      if(event.target.value.trim() && event.target.value !== this.state.searchKeyWord){
         this.fetchData(event.target.value, false);
         this.setState({
           loading: true,
         })
+      }
     }
   };
 
+  handleChange = event => {
+    clearTimeout(this.timing);
+    function foo(str) {
+      if(str.trim() && str !== this.state.searchKeyWord){
+        this.fetchData(str, false);
+        this.setState({
+          loading: true,
+        })
+      }
+    }
+    
+    this.timing = setTimeout(foo.bind(this), 3000, event.target.value);
+  }
+
   render() {
     const { classes } = this.props;
-    const { anchorEl } = this.state;
 
     return (
       <div className={classes.root}>
@@ -157,6 +183,7 @@ class SimpleTabs extends React.Component {
               shrink: true,
             }}
             onKeyPress = {this.handleKeyPress}
+            onChange = {this.handleChange}
           />
           <List className={classes.root}>
             { 
@@ -168,19 +195,6 @@ class SimpleTabs extends React.Component {
                 >
                   {this.state.total_count} repository results
                 </Typography>
-                <Button
-                  aria-owns={anchorEl ? 'simple-menu' : undefined}
-                  aria-haspopup="true"
-                  onClick={this.handleClick}
-                  className={classes.sortBtn}
-                >
-                  Sort: Best Match
-                </Button>
-                <Menu id="simple-menu" anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={this.handleClose}>
-                  <MenuItem onClick={this.handleClose}>Stars</MenuItem>
-                  <MenuItem onClick={this.handleClose}>Forks</MenuItem>
-                  <MenuItem onClick={this.handleClose}>Best Match</MenuItem>
-                </Menu>
               </ListItem>
               ) : ''
             }
